@@ -5,6 +5,8 @@ from uuid import uuid4
 
 from flask import Flask, jsonify, request
 
+import sys
+
 
 class Blockchain(object):
     def __init__(self):
@@ -17,7 +19,6 @@ class Blockchain(object):
     def new_block(self, proof, previous_hash=None):
         """
         Create a new Block in the Blockchain
-
         :param proof: <int> The proof given by the Proof of Work algorithm
         :param previous_hash: (Optional) <str> Hash of previous Block
         :return: <dict> New Block
@@ -40,7 +41,6 @@ class Blockchain(object):
     def new_transaction(self, sender, recipient, amount):
         """
         Creates a new transaction to go into the next mined Block
-
         :param sender: <str> Address of the Recipient
         :param recipient: <str> Address of the Recipient
         :param amount: <int> Amount
@@ -59,7 +59,6 @@ class Blockchain(object):
     def hash(block):
         """
         Creates a SHA-256 hash of a Block
-
         :param block": <dict> Block
         "return": <str>
         """
@@ -74,28 +73,31 @@ class Blockchain(object):
     def last_block(self):
         return self.chain[-1]
 
-    def proof_of_work(self, last_proof):
+    def proof_of_work(self):
         """
-        Simple Proof of Work Algorithm
         Find a number p such that hash(last_block_string, p) contains 6 leading
         zeroes
         """
+        block_string = json.dumps(self.last_block, sort_keys=True).encode()
+        proof = 0
+        while self.valid_proof(block_string, proof) is False:
+            proof += 1
 
-        pass
+        return proof
 
     @staticmethod
-    def valid_proof(last_proof, proof):
+    def valid_proof(block_string, proof):
         """
         Validates the Proof:  Does hash(block_string, proof) contain 6
         leading zeroes?
         """
-        # TODO
-        pass
+        guess = f'{block_string}{proof}'.encode()
+        guess_hash = hashlib.sha256(guess).hexdigest()
+        return guess_hash[:2] == "00"
 
     def valid_chain(self, chain):
         """
         Determine if a given blockchain is valid
-
         :param chain: <list> A blockchain
         :return: <bool> True if valid, False if not
         """
@@ -109,10 +111,12 @@ class Blockchain(object):
             print(f'{block}')
             print("\n-------------------\n")
             # Check that the hash of the block is correct
-            # TODO: Return false if hash isn't correct
+            if block['previous_hash'] != self.hash(last_block):
+                return False
 
             # Check that the Proof of Work is correct
-            # TODO: Return false if proof isn't correct
+            if not self.valid_proof(last_block['proof'], block['proof']):
+                return False
 
             last_block = block
             current_index += 1
@@ -136,15 +140,17 @@ def mine():
     proof = blockchain.proof_of_work()
 
     # We must receive a reward for finding the proof.
-    # TODO:
     # The sender is "0" to signify that this node has mine a new coin
-    # The recipient is the current node, it did the mining!
-    # The amount is 1 coin as a reward for mining the next block
+    blockchain.new_transaction(
+        sender="0",
+        recipient=node_identifier,
+        amount=1,
+    )
 
-    # Forge the new Block by adding it to the chain
-    # TODO
+    # Forge the new BLock by adding it to the chain
+    previous_hash = blockchain.hash(blockchain.last_block)
+    block = blockchain.new_block(proof, previous_hash)
 
-    # Send a response with the new block
     response = {
         'message': "New Block Forged",
         'index': block['index'],
@@ -176,11 +182,19 @@ def new_transaction():
 @app.route('/chain', methods=['GET'])
 def full_chain():
     response = {
-        # TODO: Return the chain and its current length
+        'chain': blockchain.chain,
+        'length': len(blockchain.chain),
     }
     return jsonify(response), 200
 
 
-# Run the program on port 5000
+# Note, when demoing, start with this, then change to the below
+# if __name__ == '__main__':
+#     app.run(host='0.0.0.0', port=5000)
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    if len(sys.argv) > 1:
+        port = int(sys.argv[1])
+    else:
+        port = 5000
+    app.run(host='0.0.0.0', port=port)
