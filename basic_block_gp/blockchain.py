@@ -114,8 +114,10 @@ class Blockchain(object):
             if block['previous_hash'] != self.hash(last_block):
                 return False
 
+            block_string = json.dumps(last_block, sort_keys=True).encode()
+
             # Check that the Proof of Work is correct
-            if not self.valid_proof(last_block['proof'], block['proof']):
+            if not self.valid_proof(block_string, block['proof']):
                 return False
 
             last_block = block
@@ -182,11 +184,11 @@ def new_transaction():
 @app.route('/chain', methods=['GET'])
 def full_chain():
     response = {
+        'valid': blockchain.valid_chain(blockchain.chain),
         'chain': blockchain.chain,
         'length': len(blockchain.chain),
     }
     return jsonify(response), 200
-
 
 # Note, when demoing, start with this, then change to the below
 # if __name__ == '__main__':
